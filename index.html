@@ -38,8 +38,17 @@
 
   /* Header */
   .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .header-left { display: flex; align-items: center; gap: 12px; }
   .header h1 { font-size: 18px; font-weight: 500; letter-spacing: -0.2px; }
   .header-right { display: flex; align-items: center; gap: 12px; }
+  .data-source-badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px;
+    font-weight: 500; white-space: nowrap;
+  }
+  .data-source-badge.remote { background: #E8F5E9; color: #2E7D32; }
+  .data-source-badge.cached { background: #FFF8E1; color: #F57F17; }
+  .data-source-badge.sample { background: #E3F2FD; color: #1565C0; }
+  .data-source-badge.import { background: #F3E5F5; color: #7B1FA2; }
   .import-btn {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 6px 14px; border-radius: var(--radius-md);
@@ -315,7 +324,10 @@
 <div class="app">
 
   <div class="header">
-    <h1>运营管控数据看板</h1>
+    <div class="header-left">
+      <h1>运营管控数据看板</h1>
+      <span class="data-source-badge" id="dataSourceBadge" style="display:none"></span>
+    </div>
     <div class="header-right">
       <label class="import-btn" for="fileInput">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
@@ -328,7 +340,7 @@
       </button>
       <button class="import-btn" onclick="resetData()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
-        重置示例
+        刷新数据
       </button>
     </div>
   </div>
@@ -375,6 +387,8 @@ let state = {
   filterStage: '全部',
   filterTier: '全部',
   activeTag: null, // {type: 'product'|'stage'|'tier'|'kpi', value: '...'}
+  dataSource: 'sample', // 'remote' | 'cached' | 'sample' | 'import'
+  dataUpdatedAt: '',
 };
 
 // ===== SAMPLE DATA GENERATOR (real business data) =====
@@ -840,12 +854,31 @@ function closeModal() {
 
 // ===== RENDER ALL =====
 function renderAll() {
+  updateDataSourceBadge();
   renderFilters();
   renderKPIs();
   renderRow1();
   renderRow2();
   renderRow3();
   renderClientList();
+}
+
+function updateDataSourceBadge() {
+  const badge = document.getElementById('dataSourceBadge');
+  if (!badge) return;
+  const ds = state.dataSource;
+  badge.className = 'data-source-badge ' + ds;
+  if (ds === 'remote') {
+    const t = state.dataUpdatedAt ? ' · ' + state.dataUpdatedAt.slice(0,10) : '';
+    badge.textContent = '☁️ 云端数据' + t;
+  } else if (ds === 'cached') {
+    badge.textContent = '📦 本地缓存';
+  } else if (ds === 'import') {
+    badge.textContent = '📁 导入数据';
+  } else {
+    badge.textContent = '📋 示例数据';
+  }
+  badge.style.display = 'inline-block';
 }
 
 // ===== CLIENT LIST (bottom panel) =====
@@ -1040,6 +1073,8 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
       state.filterProduct = '全部';
       state.filterStage = '全部';
       state.filterTier = '全部';
+      state.dataSource = 'import';
+      state.dataUpdatedAt = '';
       saveToLocal();
       renderAll();
       showToast(`成功导入 ${state.clients.length} 条客户数据`);
@@ -1107,8 +1142,13 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 
 // ===== LOCAL STORAGE =====
 const STORAGE_KEY = 'ops_dashboard_clients';
-const DATA_VERSION = 'v5'; // bump this when sample data changes to invalidate cache
+const DATA_VERSION = 'v6'; // bump this when sample data changes to invalidate cache
 const STORAGE_VERSION_KEY = 'ops_dashboard_version';
+const REMOTE_DATA_URL = 'https://raw.githubusercontent.com/tjm584/dashboard/main/data.json';
+
+// Remote data cache (separate from user-imported data)
+const REMOTE_CACHE_KEY = 'ops_dashboard_remote';
+const REMOTE_META_KEY = 'ops_dashboard_remote_meta';
 
 function saveToLocal() {
   try {
@@ -1121,7 +1161,6 @@ function loadFromLocal() {
   try {
     const ver = localStorage.getItem(STORAGE_VERSION_KEY);
     if (ver !== DATA_VERSION) {
-      // Version mismatch: old cache, clear it
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STORAGE_VERSION_KEY);
       return null;
@@ -1135,19 +1174,70 @@ function loadFromLocal() {
   return null;
 }
 
-function resetData() {
+// Load remote data from GitHub
+async function loadRemoteData() {
+  try {
+    const resp = await fetch(REMOTE_DATA_URL, { cache: 'no-cache' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    if (!json.clients || !Array.isArray(json.clients) || json.clients.length === 0) {
+      throw new Error('Invalid data format');
+    }
+    // Cache remote data and meta
+    localStorage.setItem(REMOTE_CACHE_KEY, JSON.stringify(json.clients));
+    localStorage.setItem(REMOTE_META_KEY, JSON.stringify(json.meta || {}));
+    state.dataSource = 'remote';
+    state.dataUpdatedAt = (json.meta && json.meta.updatedAt) || '';
+    return json.clients;
+  } catch(e) {
+    console.warn('Remote data load failed:', e.message);
+    return null;
+  }
+}
+
+// Get cached remote data
+function getCachedRemote() {
+  try {
+    const raw = localStorage.getItem(REMOTE_CACHE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (Array.isArray(data) && data.length > 0) {
+        const metaRaw = localStorage.getItem(REMOTE_META_KEY);
+        state.dataSource = 'cached';
+        if (metaRaw) {
+          try { state.dataUpdatedAt = JSON.parse(metaRaw).updatedAt || ''; } catch(e) {}
+        }
+        return data;
+      }
+    }
+  } catch(e) {}
+  return null;
+}
+
+async function resetData() {
   localStorage.removeItem(STORAGE_KEY);
-  state.clients = generateSampleData();
+  localStorage.removeItem(REMOTE_CACHE_KEY);
+  localStorage.removeItem(REMOTE_META_KEY);
+  // Try remote first, then fallback to sample
+  const remote = await loadRemoteData();
+  state.clients = remote || getCachedRemote() || generateSampleData();
   state.filterProduct = '全部';
   state.filterStage = '全部';
   state.filterTier = '全部';
+  state.activeTag = null;
   renderAll();
-  showToast('已重置为示例数据');
+  const label = state.dataSource === 'remote' ? '已加载最新云端数据' : '已重置为示例数据';
+  showToast(label);
 }
 
 // ===== INIT =====
-state.clients = loadFromLocal() || generateSampleData();
-renderAll();
+async function initDashboard() {
+  // Priority: remote data → cached remote → localStorage → sample
+  const remote = await loadRemoteData();
+  state.clients = remote || getCachedRemote() || loadFromLocal() || generateSampleData();
+  renderAll();
+}
+initDashboard();
 </script>
 </body>
 </html>
