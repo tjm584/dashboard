@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>运营管控数据看板</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f8f6;
+    --bg-tertiary: #f1efe8;
+    --text-primary: #2c2c2a;
+    --text-secondary: #5f5e5a;
+    --text-tertiary: #888780;
+    --border: rgba(44,44,42,0.12);
+    --border-hover: rgba(44,44,42,0.25);
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --blue-50: #E6F1FB; --blue-100: #B5D4F4; --blue-400: #378ADD; --blue-600: #185FA5; --blue-800: #0C447C;
+    --green-50: #EAF3DE; --green-100: #C0DD97; --green-400: #639922; --green-600: #3B6D11; --green-800: #27500A;
+    --amber-50: #FAEEDA; --amber-100: #FAC775; --amber-400: #EF9F27; --amber-600: #854F0B;
+    --red-50: #FCEBEB; --red-100: #F7C1C1; --red-400: #E24B4A; --red-600: #A32D2D; --red-800: #791F1F;
+    --purple-50: #EEEDFE; --purple-100: #CECBF6; --purple-400: #7F77DD; --purple-600: #534AB7;
+    --teal-50: #E1F5EE; --teal-100: #9FE1CB; --teal-400: #1D9E75; --teal-600: #0F6E56;
+    --coral-50: #FAECE7; --coral-100: #F0997B; --coral-400: #D85A30; --coral-600: #993C1D;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 1360px; margin: 0 auto; padding: 24px 28px 40px; }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .header h1 { font-size: 18px; font-weight: 500; letter-spacing: -0.2px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .import-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: var(--radius-md);
+    background: var(--bg-primary); border: 0.5px solid var(--border-hover);
+    font-size: 12px; color: var(--text-secondary); cursor: pointer;
+    transition: all 0.15s;
+  }
+  .import-btn:hover { border-color: var(--blue-400); color: var(--blue-600); }
+  .import-btn svg { width: 14px; height: 14px; }
+  #fileInput { display: none; }
+
+  /* Filters */
+  .filters {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;
+    padding: 12px 16px; background: var(--bg-primary);
+    border-radius: var(--radius-lg); border: 0.5px solid var(--border);
+  }
+  .filter-group { display: flex; align-items: center; gap: 6px; }
+  .filter-label { font-size: 11px; color: var(--text-tertiary); white-space: nowrap; }
+  .filter-btn {
+    padding: 3px 10px; border-radius: 20px; font-size: 11px;
+    background: var(--bg-secondary); border: 0.5px solid transparent;
+    color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .filter-btn:hover { border-color: var(--border-hover); }
+  .filter-btn.active {
+    background: var(--blue-50); color: var(--blue-600);
+    border-color: var(--blue-400);
+  }
+  .filter-divider { width: 1px; background: var(--border); margin: 0 6px; }
+
+  /* KPI Cards */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi-card {
+    background: var(--bg-primary); border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border); padding: 16px 18px;
+    transition: box-shadow 0.15s;
+  }
+  .kpi-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .kpi-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+  .kpi-value { font-size: 26px; font-weight: 500; }
+  .kpi-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+  .kpi-trend-up { color: var(--green-600); }
+  .kpi-trend-down { color: var(--red-600); }
+  .c-blue { color: var(--blue-600); }
+  .c-green { color: var(--green-600); }
+  .c-red { color: var(--red-600); }
+  .c-amber { color: var(--amber-600); }
+
+  /* Grid layouts */
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .row-full { margin-bottom: 16px; }
+
+  /* Card */
+  .card {
+    background: var(--bg-primary); border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border); padding: 16px 18px;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 500; margin-bottom: 14px;
+    padding-bottom: 10px; border-bottom: 0.5px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-title .badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px;
+    font-weight: 400;
+  }
+
+  /* Product grid */
+  .product-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .product-item {
+    background: var(--bg-secondary); border-radius: var(--radius-md);
+    padding: 10px 14px; cursor: pointer; transition: all 0.15s;
+    border: 1px solid transparent;
+  }
+  .product-item:hover { background: var(--blue-50); }
+  .product-item.active { border-color: var(--blue-400); background: var(--blue-50); }
+  .product-name { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+  .product-count { font-size: 20px; font-weight: 500; color: var(--blue-600); }
+  .summary-row {
+    margin-top: 12px; padding-top: 10px; border-top: 0.5px solid var(--border);
+    display: flex; gap: 20px;
+  }
+  .summary-item { font-size: 12px; color: var(--text-secondary); }
+  .summary-item span { font-weight: 500; }
+
+  /* Stage bars */
+  .stage-row {
+    display: flex; align-items: center; padding: 6px 0;
+    border-bottom: 0.5px solid var(--border); cursor: pointer;
+    transition: background 0.1s;
+  }
+  .stage-row:last-child { border-bottom: none; }
+  .stage-row:hover { background: var(--bg-secondary); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 4px; }
+  .stage-name { flex: 1; font-size: 12px; }
+  .stage-bar-wrap {
+    flex: 2; margin: 0 12px; background: var(--bg-secondary);
+    border-radius: 4px; height: 6px; overflow: hidden;
+  }
+  .stage-bar { height: 6px; border-radius: 4px; transition: width 0.6s ease; }
+  .stage-count { font-weight: 500; width: 28px; text-align: right; font-size: 13px; }
+
+  /* Tier */
+  .tier-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0;
+    border-bottom: 0.5px solid var(--border); cursor: pointer;
+    transition: background 0.1s;
+  }
+  .tier-row:last-child { border-bottom: none; }
+  .tier-row:hover { background: var(--bg-secondary); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 4px; }
+  .tier-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .tier-name { flex: 1; font-size: 12px; }
+  .tier-count { font-weight: 500; font-size: 13px; }
+  .tier-badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px;
+  }
+
+  /* Risk items */
+  .risk-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 0;
+    border-bottom: 0.5px solid var(--border); cursor: pointer;
+    transition: background 0.1s;
+  }
+  .risk-item:last-child { border-bottom: none; }
+  .risk-item:hover { background: var(--bg-secondary); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 4px; }
+  .risk-days {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px;
+    font-weight: 500; flex-shrink: 0;
+  }
+  .risk-days.red { background: var(--red-50); color: var(--red-600); }
+  .risk-days.amber { background: var(--amber-50); color: var(--amber-600); }
+  .risk-days.green { background: var(--green-50); color: var(--green-600); }
+  .risk-client { flex: 1; font-size: 12px; }
+  .risk-product { font-size: 11px; color: var(--text-tertiary); }
+  .risk-score { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; }
+
+  /* Health */
+  .health-row {
+    display: flex; align-items: center; gap: 8px; padding: 8px 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .health-row:last-child { border-bottom: none; }
+  .health-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .health-name { flex: 1; font-size: 12px; }
+  .health-stage { font-size: 11px; color: var(--text-secondary); width: 72px; text-align: right; }
+  .health-score { font-size: 12px; font-weight: 500; width: 44px; text-align: right; }
+  .health-bar-wrap { width: 60px; background: var(--bg-secondary); border-radius: 3px; height: 4px; overflow: hidden; }
+  .health-bar { height: 4px; border-radius: 3px; }
+
+  /* Action items */
+  .action-item {
+    display: flex; gap: 10px; padding: 8px 0;
+    border-bottom: 0.5px solid var(--border); align-items: flex-start;
+  }
+  .action-item:last-child { border-bottom: none; }
+  .action-type {
+    font-size: 10px; padding: 2px 8px; border-radius: 4px;
+    flex-shrink: 0; margin-top: 1px; font-weight: 500;
+  }
+  .type-renew { background: var(--amber-50); color: var(--amber-600); }
+  .type-issue { background: var(--red-50); color: var(--red-600); }
+  .type-deliver { background: var(--blue-50); color: var(--blue-600); }
+  .action-text { flex: 1; line-height: 1.5; font-size: 12px; }
+  .action-owner { font-size: 11px; color: var(--text-tertiary); flex-shrink: 0; }
+
+  /* Trend */
+  .trend-container { display: flex; align-items: flex-end; gap: 6px; height: 100px; padding-top: 10px; }
+  .trend-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .trend-bar { width: 100%; border-radius: 3px 3px 0 0; transition: height 0.5s ease; }
+  .trend-num { font-size: 10px; color: var(--text-secondary); }
+  .trend-label { font-size: 10px; color: var(--text-tertiary); }
+  .trend-summary {
+    display: flex; gap: 20px; margin-top: 12px; padding-top: 10px;
+    border-top: 0.5px solid var(--border);
+  }
+
+  /* Detail modal */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.35); z-index: 1000;
+    display: none; align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--bg-primary); border-radius: var(--radius-lg);
+    width: 90%; max-width: 900px; max-height: 80vh;
+    overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 0.5px solid var(--border);
+    position: sticky; top: 0; background: var(--bg-primary); z-index: 1;
+  }
+  .modal-header h2 { font-size: 15px; font-weight: 500; }
+  .modal-close {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--bg-secondary); border: none;
+    cursor: pointer; font-size: 16px; color: var(--text-secondary);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-body { padding: 16px 20px; }
+  .detail-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .detail-table th {
+    text-align: left; padding: 8px 10px; font-weight: 500;
+    background: var(--bg-secondary); border-bottom: 0.5px solid var(--border);
+    position: sticky; top: 0; font-size: 11px; color: var(--text-secondary);
+  }
+  .detail-table td { padding: 8px 10px; border-bottom: 0.5px solid var(--border); }
+  .detail-table tr:hover td { background: var(--bg-secondary); }
+  .status-tag {
+    display: inline-block; font-size: 10px; padding: 1px 7px;
+    border-radius: 10px; font-weight: 500;
+  }
+  .tier-tag {
+    display: inline-block; font-size: 10px; padding: 1px 7px;
+    border-radius: 10px; font-weight: 500;
+  }
+
+  /* Client list panel */
+  #clientListWrap {
+    display: none;
+    margin-top: 16px;
+  }
+  #clientListWrap.show { display: block; }
+  .client-list-card {
+    background: var(--bg-primary); border-radius: var(--radius-lg);
+    padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .client-list-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px; padding-bottom: 10px; border-bottom: 0.5px solid var(--border);
+  }
+  .client-list-title { font-size: 14px; font-weight: 600; }
+  .client-list-title span { font-weight: 400; color: var(--text-tertiary); font-size: 12px; margin-left: 6px; }
+  .client-list-close {
+    width: 24px; height: 24px; border: none; background: var(--bg-secondary);
+    border-radius: 50%; cursor: pointer; font-size: 14px; color: var(--text-tertiary);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .client-list-close:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+  .client-list-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .client-list-table th {
+    text-align: left; padding: 6px 10px; font-weight: 500;
+    background: var(--bg-secondary); border-bottom: 0.5px solid var(--border);
+    position: sticky; top: 0; font-size: 11px; color: var(--text-secondary);
+  }
+  .client-list-table td { padding: 7px 10px; border-bottom: 0.5px solid var(--border); }
+  .client-list-table tr { cursor: pointer; }
+  .client-list-table tr:hover td { background: var(--bg-secondary); }
+  .client-list-table .cl-name { font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .client-list-table .cl-expiry { font-size: 10px; font-weight: 500; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--text-primary); color: var(--bg-primary);
+    padding: 10px 18px; border-radius: var(--radius-md);
+    font-size: 12px; z-index: 2000;
+    transform: translateY(20px); opacity: 0; transition: all 0.3s;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .row-2, .row-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <h1>运营管控数据看板</h1>
+    <div class="header-right">
+      <label class="import-btn" for="fileInput">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        导入数据
+      </label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
+      <button class="import-btn" onclick="exportTemplate()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        下载模板
+      </button>
+      <button class="import-btn" onclick="resetData()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+        重置示例
+      </button>
+    </div>
+  </div>
+
+  <div class="filters" id="filters"></div>
+  <div class="kpi-grid" id="kpiGrid"></div>
+  <div class="row-2" id="row1"></div>
+  <div class="row-3" id="row2"></div>
+  <div class="row-2" id="row3"></div>
+  <div id="clientListWrap"></div>
+
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">客户明细</h2>
+      <button class="modal-close" onclick="closeModal()">x</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== DATA MODEL =====
+const PRODUCTS = ['GEO季度版', 'GEO年度版', 'GEO特殊版', 'AI百问'];
+const STAGES = ['资料准备期', '账号搭建期', '文章训练期', '首次交付期', '循环优化期', '难点解决期', '续费跟进期', '账户失效期'];
+const TIERS = ['难点客户', '重点客户', '常规客户', '项目客户', '失效客户'];
+const TIER_META = {
+  '难点客户': { color: '#E24B4A', bg: 'var(--red-50)', text: 'var(--red-600)', label: '需重点攻关' },
+  '重点客户': { color: '#EF9F27', bg: 'var(--amber-50)', text: 'var(--amber-600)', label: '高价值维护' },
+  '常规客户': { color: '#378ADD', bg: 'var(--blue-50)', text: 'var(--blue-600)', label: '标准运营' },
+  '项目客户': { color: '#7F77DD', bg: 'var(--purple-50)', text: 'var(--purple-600)', label: '专项管理' },
+  '失效客户': { color: '#888780', bg: 'var(--bg-secondary)', text: 'var(--text-tertiary)', label: '合同已失效' },
+};
+const STAGE_COLORS = ['#B5D4F4','#9FE1CB','#5DCAA5','#CECBF6','#C0DD97','#FAC775','#F0997B','#D4D3CE'];
+const STAGE_TEXT_COLORS = ['#185FA5','#0F6E56','#0F6E56','#534AB7','#3B6D11','#854F0B','#993C1D'];
+
+let state = {
+  clients: [],
+  filterProduct: '全部',
+  filterStage: '全部',
+  filterTier: '全部',
+  activeTag: null, // {type: 'product'|'stage'|'tier'|'kpi', value: '...'}
+};
+
+// ===== SAMPLE DATA GENERATOR (real business data) =====
+// 67 clients from 运营管控看板_数据模板
+// GEO季度版=6, GEO半年版=0, GEO年度版=30, GEO特殊版=12, AI百问=19
+function generateSampleData() {
+  const today = new Date();
+  const raw = [
+  {id:1,name:'湖南楚一机电有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2026-11-14',isQuarterNew:false,signedDate:'2025-10-15',owner:'芳芳',notes:''},
+  {id:2,name:'湖南鑫万特金属材料有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2026-12-06',isQuarterNew:false,signedDate:'2025-11-06',owner:'芳芳',notes:''},
+  {id:3,name:'湘潭华丰仪器制造有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2026-11-28',isQuarterNew:false,signedDate:'2025-10-29',owner:'芳芳',notes:''},
+  {id:4,name:'湖南湘质技术服务有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2026-12-11',isQuarterNew:false,signedDate:'2025-11-11',owner:'芳芳',notes:''},
+  {id:5,name:'长沙叁仟新材料科技有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2026-11-23',isQuarterNew:false,signedDate:'2025-10-24',owner:'芳芳',notes:''},
+  {id:6,name:'湖南新创煜智能科技有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2027-05-11',isQuarterNew:false,signedDate:'2025-11-11',owner:'芳芳',notes:''},
+  {id:7,name:'湖南筑励咨询有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:75,contractEnd:'2026-11-27',isQuarterNew:false,signedDate:'2025-10-28',owner:'芳芳',notes:''},
+  {id:8,name:'长沙宁松建材有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2026-12-06',isQuarterNew:false,signedDate:'2025-11-06',owner:'芳芳',notes:''},
+  {id:9,name:'湘潭市仪器仪表有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2026-12-04',isQuarterNew:false,signedDate:'2025-11-04',owner:'芳芳',notes:''},
+  {id:10,name:'湖南莱锶达仪器设备有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:75,contractEnd:'2026-12-11',isQuarterNew:false,signedDate:'2025-11-11',owner:'芳芳',notes:''},
+  {id:11,name:'长沙凯利特泵业有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:75,contractEnd:'2026-11-13',isQuarterNew:false,signedDate:'2025-11-13',owner:'芳芳',notes:''},
+  {id:12,name:'株洲海润环保设备有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2027-03-09',isQuarterNew:false,signedDate:'2025-11-11',owner:'芳芳',notes:''},
+  {id:13,name:'湖南仁仁洁国际清洁科技集团股份有限公司',product:'AI百问',stage:'难点解决期',tier:'难点客户',healthScore:50,contractEnd:'2027-01-01',isQuarterNew:false,signedDate:'2025-12-02',owner:'芳芳',notes:''},
+  {id:14,name:'湖南天硕创新科技有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:60,contractEnd:'2026-05-11',isQuarterNew:false,signedDate:'2026-03-12',owner:'芳芳',notes:''},
+  {id:15,name:'湖南玉桓环保科技有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2027-01-29',isQuarterNew:false,signedDate:'2025-12-30',owner:'芳芳',notes:''},
+  {id:16,name:'株洲亿旺新材料有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2027-02-13',isQuarterNew:false,signedDate:'2026-01-14',owner:'芳芳',notes:''},
+  {id:17,name:'湖南一凡教学设备有限公司',product:'AI百问',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2026-10-16',isQuarterNew:false,signedDate:'2025-09-16',owner:'芳芳',notes:''},
+  {id:18,name:'湖南天鹰保安服务有限公司',product:'AI百问',stage:'文章训练期',tier:'常规客户',healthScore:70,contractEnd:'2026-08-11',isQuarterNew:true,signedDate:'2026-05-13',owner:'芳芳',notes:''},
+  {id:19,name:'爱尔眼科医院集团股份有限公司',product:'GEO特殊版',stage:'循环优化期',tier:'项目客户',healthScore:80,contractEnd:'2026-10-26',isQuarterNew:false,signedDate:'2025-10-23',owner:'诗雨',notes:''},
+  {id:20,name:'湖南希赛网络科技有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2027-05-01',isQuarterNew:false,signedDate:'2025-10-31',owner:'诗雨',notes:''},
+  {id:21,name:'长沙阳光医院有限责任公司',product:'GEO特殊版',stage:'循环优化期',tier:'重点客户',healthScore:60,contractEnd:'2026-12-22',isQuarterNew:false,signedDate:'2025-12-22',owner:'诗雨',notes:''},
+  {id:22,name:'北京星途河轮国际旅行社有限公司',product:'GEO季度版',stage:'账户失效期',tier:'失效客户',healthScore:0,contractEnd:'2026-04-21',isQuarterNew:false,signedDate:'2026-01-21',owner:'诗雨',notes:''},
+  {id:23,name:'长沙容测电子股份有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:90,contractEnd:'2027-03-27',isQuarterNew:false,signedDate:'2026-01-27',owner:'诗雨',notes:''},
+  {id:24,name:'长沙雷电云网络科技有限公司',product:'GEO季度版',stage:'账户失效期',tier:'失效客户',healthScore:0,contractEnd:'2026-04-27',isQuarterNew:false,signedDate:'2026-01-27',owner:'诗雨',notes:''},
+  {id:25,name:'爱尔眼科医院集团股份有限公司长沙爱尔眼科医院',product:'GEO特殊版',stage:'循环优化期',tier:'项目客户',healthScore:70,contractEnd:'2027-02-02',isQuarterNew:false,signedDate:'2026-02-02',owner:'诗雨',notes:''},
+  {id:26,name:'湖南慧友酒店集团有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2027-02-13',isQuarterNew:false,signedDate:'2026-02-13',owner:'诗雨',notes:''},
+  {id:27,name:'河北维达康生物科技股份有限公司-1',product:'GEO年度版',stage:'循环优化期',tier:'重点客户',healthScore:80,contractEnd:'2027-06-06',isQuarterNew:false,signedDate:'2026-03-06',owner:'诗雨',notes:''},
+  {id:28,name:'河北维达康生物科技股份有限公司-2',product:'GEO年度版',stage:'循环优化期',tier:'重点客户',healthScore:80,contractEnd:'2026-06-10',isQuarterNew:false,signedDate:'2026-03-10',owner:'诗雨',notes:''},
+  {id:29,name:'湖南明星影视艺术职业学校',product:'GEO季度版',stage:'难点解决期',tier:'难点客户',healthScore:50,contractEnd:'2026-06-09',isQuarterNew:false,signedDate:'2026-03-09',owner:'诗雨',notes:''},
+  {id:30,name:'湖南雪宝装饰材料有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2027-06-08',isQuarterNew:false,signedDate:'2026-03-08',owner:'诗雨',notes:''},
+  {id:31,name:'岚驰礼宾(北京)国际旅行社有限公司',product:'GEO季度版',stage:'难点解决期',tier:'难点客户',healthScore:20,contractEnd:'2026-06-23',isQuarterNew:false,signedDate:'2026-03-23',owner:'诗雨',notes:''},
+  {id:32,name:'株洲三达电子制造有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2027-06-18',isQuarterNew:false,signedDate:'2026-03-18',owner:'诗雨',notes:''},
+  {id:33,name:'长沙多灵环保科技有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2027-06-18',isQuarterNew:false,signedDate:'2026-03-18',owner:'诗雨',notes:''},
+  {id:34,name:'湖南助农米珍生物科技有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2027-03-13',isQuarterNew:false,signedDate:'2026-03-13',owner:'诗雨',notes:''},
+  {id:35,name:'长沙高安建材贸易有限公司',product:'GEO年度版',stage:'难点解决期',tier:'难点客户',healthScore:50,contractEnd:'2027-07-01',isQuarterNew:false,signedDate:'2026-03-31',owner:'诗雨',notes:''},
+  {id:36,name:'长沙小核码编程网络科技有限公司',product:'GEO季度版',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2026-07-01',isQuarterNew:false,signedDate:'2026-03-31',owner:'诗雨',notes:''},
+  {id:37,name:'隆鑫通用动力股份有限公司',product:'GEO年度版',stage:'难点解决期',tier:'难点客户',healthScore:50,contractEnd:'2027-07-01',isQuarterNew:false,signedDate:'2026-03-31',owner:'诗雨',notes:''},
+  {id:38,name:'湖南芙蓉律师事务所',product:'GEO年度版',stage:'难点解决期',tier:'难点客户',healthScore:50,contractEnd:'2027-07-01',isQuarterNew:false,signedDate:'2026-03-31',owner:'诗雨',notes:''},
+  {id:39,name:'湖南唐门文化传媒有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2027-07-01',isQuarterNew:false,signedDate:'2026-03-31',owner:'诗雨',notes:''},
+  {id:40,name:'湖南弘林科学仪器有限公司',product:'GEO年度版',stage:'循环优化期',tier:'重点客户',healthScore:70,contractEnd:'2027-07-01',isQuarterNew:false,signedDate:'2026-03-31',owner:'诗雨',notes:''},
+  {id:41,name:'湖南鹰隼生物科技有限公司',product:'GEO年度版',stage:'难点解决期',tier:'难点客户',healthScore:50,contractEnd:'2027-07-01',isQuarterNew:false,signedDate:'2026-03-31',owner:'诗雨',notes:''},
+  {id:42,name:'安徽爱尔眼科医院有限公司',product:'GEO特殊版',stage:'循环优化期',tier:'项目客户',healthScore:70,contractEnd:'2027-04-08',isQuarterNew:true,signedDate:'2026-04-08',owner:'诗雨',notes:''},
+  {id:43,name:'深圳爱尔眼科医院',product:'GEO特殊版',stage:'循环优化期',tier:'项目客户',healthScore:60,contractEnd:'2027-04-17',isQuarterNew:true,signedDate:'2026-04-17',owner:'诗雨',notes:''},
+  {id:44,name:'湖南泰瑞医疗科技股份有限公司',product:'GEO特殊版',stage:'循环优化期',tier:'重点客户',healthScore:70,contractEnd:'2027-04-17',isQuarterNew:true,signedDate:'2026-04-17',owner:'诗雨',notes:''},
+  {id:45,name:'长沙考翼教育咨询有限公司',product:'GEO季度版',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2026-07-17',isQuarterNew:true,signedDate:'2026-04-17',owner:'诗雨',notes:''},
+  {id:46,name:'湖南彩艺光电科技有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2027-07-17',isQuarterNew:true,signedDate:'2026-04-17',owner:'诗雨',notes:''},
+  {id:47,name:'武汉爱尔眼科医院有限公司',product:'GEO特殊版',stage:'循环优化期',tier:'项目客户',healthScore:70,contractEnd:'2027-04-21',isQuarterNew:true,signedDate:'2026-04-21',owner:'诗雨',notes:''},
+  {id:48,name:'湖南东方时装有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2027-07-27',isQuarterNew:true,signedDate:'2026-04-27',owner:'诗雨',notes:''},
+  {id:49,name:'昆明爱尔眼科医院有限公司',product:'GEO特殊版',stage:'循环优化期',tier:'项目客户',healthScore:70,contractEnd:'2027-04-27',isQuarterNew:true,signedDate:'2026-04-27',owner:'诗雨',notes:''},
+  {id:50,name:'江苏爱尔-淮安爱尔眼科医院有限公司',product:'GEO特殊版',stage:'循环优化期',tier:'项目客户',healthScore:70,contractEnd:'2027-04-28',isQuarterNew:true,signedDate:'2026-04-28',owner:'诗雨',notes:''},
+  {id:51,name:'湖南鑫住工美宅科技有限公司',product:'GEO年度版',stage:'难点解决期',tier:'难点客户',healthScore:60,contractEnd:'2027-07-28',isQuarterNew:true,signedDate:'2026-04-28',owner:'诗雨',notes:''},
+  {id:52,name:'石家庄绿科有害生物防治技术有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:80,contractEnd:'2027-07-29',isQuarterNew:true,signedDate:'2026-04-29',owner:'诗雨',notes:''},
+  {id:53,name:'湖南瑞仪卡电子科技有限公司',product:'GEO年度版',stage:'循环优化期',tier:'常规客户',healthScore:70,contractEnd:'2027-07-30',isQuarterNew:true,signedDate:'2026-04-30',owner:'诗雨',notes:''},
+  {id:54,name:'湖南森启科技有限公司',product:'GEO年度版',stage:'文章训练期',tier:'重点客户',healthScore:70,contractEnd:'2027-05-07',isQuarterNew:true,signedDate:'2026-05-07',owner:'诗雨',notes:''},
+  {id:55,name:'湖南知了教育科技有限公司',product:'GEO年度版',stage:'文章训练期',tier:'重点客户',healthScore:60,contractEnd:'2027-05-07',isQuarterNew:true,signedDate:'2026-05-07',owner:'诗雨',notes:''},
+  {id:56,name:'湖南浩途信息科技有限公司',product:'GEO年度版',stage:'文章训练期',tier:'常规客户',healthScore:70,contractEnd:'2027-07-12',isQuarterNew:true,signedDate:'2026-05-12',owner:'诗雨',notes:''},
+  {id:57,name:'湖南深思电工实业有限公司',product:'GEO年度版',stage:'文章训练期',tier:'常规客户',healthScore:70,contractEnd:'2027-07-30',isQuarterNew:true,signedDate:'2026-04-30',owner:'诗雨',notes:''},
+  {id:58,name:'长沙果缤纷商业管理有限责任公司',product:'GEO年度版',stage:'文章训练期',tier:'重点客户',healthScore:70,contractEnd:'2027-07-15',isQuarterNew:true,signedDate:'2026-05-14',owner:'诗雨',notes:''},
+  {id:59,name:'武汉爱尔眼科汉口医院有限公司',product:'GEO特殊版',stage:'文章训练期',tier:'项目客户',healthScore:50,contractEnd:'2027-05-15',isQuarterNew:true,signedDate:'2026-05-18',owner:'诗雨',notes:''},
+  {id:60,name:'湖南艺脂医疗美容有限公司',product:'GEO特殊版',stage:'文章训练期',tier:'重点客户',healthScore:50,contractEnd:'2027-05-25',isQuarterNew:true,signedDate:'2026-05-18',owner:'诗雨',notes:''},
+  {id:61,name:'湖南省联众磁学仪器有限公司',product:'GEO年度版',stage:'资料准备期',tier:'常规客户',healthScore:0,contractEnd:'',isQuarterNew:true,signedDate:'2026-05-18',owner:'诗雨',notes:''},
+  {id:62,name:'广州市航音建材有限公司',product:'GEO年度版',stage:'资料准备期',tier:'常规客户',healthScore:0,contractEnd:'',isQuarterNew:true,signedDate:'2026-05-25',owner:'诗雨',notes:''},
+  {id:63,name:'广州市合音声学材料有限公司',product:'GEO年度版',stage:'资料准备期',tier:'常规客户',healthScore:0,contractEnd:'',isQuarterNew:true,signedDate:'2026-05-25',owner:'诗雨',notes:''},
+  {id:64,name:'长沙市有志记忆教育咨询有限公司',product:'GEO年度版',stage:'资料准备期',tier:'常规客户',healthScore:0,contractEnd:'',isQuarterNew:true,signedDate:'2026-05-26',owner:'诗雨',notes:''},
+  {id:65,name:'长沙星城宏朗眼科医院有限公司',product:'GEO特殊版',stage:'资料准备期',tier:'重点客户',healthScore:0,contractEnd:'',isQuarterNew:true,signedDate:'2026-05-27',owner:'诗雨',notes:''},
+  {id:66,name:'长沙锐信管业有限公司',product:'AI百问',stage:'资料准备期',tier:'常规客户',healthScore:0,contractEnd:'',isQuarterNew:true,signedDate:'2026-05-27',owner:'芳芳',notes:''},
+  {id:67,name:'长沙海博机电设备有限公司',product:'GEO年度版',stage:'资料准备期',tier:'重点客户',healthScore:0,contractEnd:'',isQuarterNew:true,signedDate:'2026-05-27',owner:'诗雨',notes:''}
+  ];
+  // Enrich with computed daysToExpiry and isChurned
+  return raw.map(c => {
+    let daysToExpiry, isChurned;
+    if (c.contractEnd) {
+      const endDate = new Date(c.contractEnd);
+      daysToExpiry = Math.floor((endDate - today) / 86400000);
+      isChurned = daysToExpiry < -15;
+    } else {
+      // No contract end date: new client, not yet set
+      daysToExpiry = 999;
+      isChurned = false;
+    }
+    return {...c, daysToExpiry, isChurned};
+  });
+}
+
+// ===== FILTERED DATA =====
+function getFiltered() {
+  return state.clients.filter(c => {
+    if (state.filterProduct !== '全部' && c.product !== state.filterProduct) return false;
+    if (state.filterStage !== '全部' && c.stage !== state.filterStage) return false;
+    if (state.filterTier !== '全部' && c.tier !== state.filterTier) return false;
+    return true;
+  });
+}
+
+// ===== RENDER: Filters =====
+function renderFilters() {
+  const el = document.getElementById('filters');
+  let html = '';
+  html += '<div class="filter-group"><span class="filter-label">产品</span>';
+  html += `<button class="filter-btn ${state.filterProduct==='全部'?'active':''}" onclick="setFilter('product','全部')">全部</button>`;
+  PRODUCTS.forEach(p => {
+    html += `<button class="filter-btn ${state.filterProduct===p?'active':''}" onclick="setFilter('product','${p}')">${p}</button>`;
+  });
+  html += '</div><div class="filter-divider"></div>';
+  html += '<div class="filter-group"><span class="filter-label">状态</span>';
+  html += `<button class="filter-btn ${state.filterStage==='全部'?'active':''}" onclick="setFilter('stage','全部')">全部</button>`;
+  STAGES.forEach(s => {
+    html += `<button class="filter-btn ${state.filterStage===s?'active':''}" onclick="setFilter('stage','${s}')">${s}</button>`;
+  });
+  html += '</div><div class="filter-divider"></div>';
+  html += '<div class="filter-group"><span class="filter-label">分层</span>';
+  html += `<button class="filter-btn ${state.filterTier==='全部'?'active':''}" onclick="setFilter('tier','全部')">全部</button>`;
+  TIERS.forEach(t => {
+    html += `<button class="filter-btn ${state.filterTier===t?'active':''}" onclick="setFilter('tier','${t}')">${t}</button>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function setFilter(type, val) {
+  if (type === 'product') state.filterProduct = val;
+  if (type === 'stage') state.filterStage = val;
+  if (type === 'tier') state.filterTier = val;
+  state.activeTag = null; // close client list when filter changes
+  renderAll();
+}
+
+// ===== RENDER: KPIs =====
+// KPIs always show global stats (not affected by filters)
+function renderKPIs() {
+  const allData = state.clients;
+  const filtered = getFiltered();
+  const active = allData.filter(c => !c.isChurned);
+  const churned = allData.filter(c => c.isChurned);
+  const quarterNew = allData.filter(c => c.isQuarterNew);
+  const expirySoon = active.filter(c => c.daysToExpiry >= 0 && c.daysToExpiry <= 30);
+  const el = document.getElementById('kpiGrid');
+  el.innerHTML = `
+    <div class="kpi-card" style="cursor:pointer" onclick="showTagClients('kpi','active')">
+      <div class="kpi-label">在投客户总数</div>
+      <div class="kpi-value c-blue">${active.length}</div>
+      <div class="kpi-sub">共 ${allData.length} 个客户</div>
+    </div>
+    <div class="kpi-card" style="cursor:pointer" onclick="showTagClients('kpi','quarterNew')">
+      <div class="kpi-label">本季度新签客户</div>
+      <div class="kpi-value c-green">${quarterNew.length}</div>
+      <div class="kpi-sub">占在投客户 ${active.length ? Math.round(quarterNew.length/active.length*100) : 0}%</div>
+    </div>
+    <div class="kpi-card" style="cursor:pointer" onclick="showTagClients('kpi','churned')">
+      <div class="kpi-label">失效客户数</div>
+      <div class="kpi-value c-red">${churned.length}</div>
+      <div class="kpi-sub">本季度累计</div>
+    </div>
+    <div class="kpi-card" style="cursor:pointer" onclick="showTagClients('kpi','expirySoon')">
+      <div class="kpi-label">30天内到期客户</div>
+      <div class="kpi-value c-amber">${expirySoon.length}</div>
+      <div class="kpi-sub">需优先跟进续费</div>
+    </div>
+  `;
+}
+
+// ===== RENDER: Row 1 (Product + Stage) =====
+function renderRow1() {
+  const data = getFiltered();
+  const active = data.filter(c => !c.isChurned);
+  const el = document.getElementById('row1');
+
+  // Product breakdown
+  let productHtml = '';
+  PRODUCTS.forEach(p => {
+    const count = active.filter(c => c.product === p).length;
+    const isActive = state.activeTag && state.activeTag.type === 'product' && state.activeTag.value === p;
+    productHtml += `
+      <div class="product-item ${isActive?'active':''}" onclick="showTagClients('product','${p}')">
+        <div class="product-name">${p}</div>
+        <div class="product-count">${count}</div>
+      </div>
+    `;
+  });
+  const churned = data.filter(c => c.isChurned).length;
+  const qNew = data.filter(c => c.isQuarterNew).length;
+  const renewRate = active.length > 0 ? Math.round((1 - churned / (active.length + churned)) * 100) : 0;
+
+  // Stage breakdown
+  let stageHtml = '';
+  const maxStageCount = Math.max(...STAGES.map(s => active.filter(c => c.stage === s).length), 1);
+  STAGES.forEach((s, i) => {
+    const count = active.filter(c => c.stage === s).length;
+    const pct = Math.round(count / maxStageCount * 100);
+    stageHtml += `
+      <div class="stage-row" onclick="showTagClients('stage','${s}')">
+        <span class="stage-name">${s}</span>
+        <div class="stage-bar-wrap"><div class="stage-bar" style="width:${pct}%;background:${STAGE_COLORS[i]}"></div></div>
+        <span class="stage-count" style="color:${STAGE_TEXT_COLORS[i]}">${count}</span>
+      </div>
+    `;
+  });
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">在投客户数（按产品）<span class="badge" style="background:var(--blue-50);color:var(--blue-600)">${active.length} 家</span></div>
+      <div class="product-grid">${productHtml}</div>
+      <div class="summary-row">
+        <span class="summary-item">失效：<span class="c-red">${churned}</span></span>
+        <span class="summary-item">本季新签：<span class="c-green">${qNew}</span></span>
+        <span class="summary-item">续费率：<span>${renewRate}%</span></span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">客户状态分类<span class="badge" style="background:var(--green-50);color:var(--green-600)">7 个阶段</span></div>
+      ${stageHtml}
+    </div>
+  `;
+}
+
+// ===== RENDER: Row 2 (Tier + Risk + Health) =====
+function renderRow2() {
+  const data = getFiltered();
+  const active = data.filter(c => !c.isChurned);
+  const el = document.getElementById('row2');
+
+  // Tier
+  let tierHtml = '';
+  TIERS.forEach(t => {
+    const meta = TIER_META[t];
+    const count = active.filter(c => c.tier === t).length;
+    tierHtml += `
+      <div class="tier-row" onclick="showTagClients('tier','${t}')">
+        <div class="tier-dot" style="background:${meta.color}"></div>
+        <span class="tier-name">${t}</span>
+        <span class="tier-count" style="color:${meta.text}">${count}</span>
+        <span class="tier-badge" style="background:${meta.bg};color:${meta.text}">${meta.label}</span>
+      </div>
+    `;
+  });
+
+  // Risk
+  const atRisk = active.filter(c => c.daysToExpiry >= -15 && c.daysToExpiry <= 45)
+    .sort((a, b) => a.daysToExpiry - b.daysToExpiry);
+  let riskHtml = '';
+  if (atRisk.length === 0) {
+    riskHtml = '<div style="padding:20px;text-align:center;color:var(--text-tertiary);font-size:12px;">暂无续费风险客户</div>';
+  } else {
+    atRisk.slice(0, 6).forEach(c => {
+      const d = c.daysToExpiry;
+      const cls = d <= 15 ? 'red' : d <= 30 ? 'amber' : 'green';
+      const label = d < 0 ? `已过期${Math.abs(d)}天` : `${d}天`;
+      riskHtml += `
+        <div class="risk-item" onclick="showDetail(${c.id})">
+          <span class="risk-days ${cls}">${label}</span>
+          <span class="risk-client">${c.name}<br><span class="risk-product">${c.product}</span></span>
+          <span class="risk-score" style="color:${c.healthScore<60?'var(--red-600)':c.healthScore<75?'var(--amber-600)':'var(--text-secondary)'}">健康度 ${c.healthScore}</span>
+        </div>
+      `;
+    });
+  }
+
+  // Health - focus on low score clients
+  const lowHealth = active.filter(c => c.healthScore < 70).sort((a, b) => a.healthScore - b.healthScore);
+  let healthHtml = '';
+  if (lowHealth.length === 0) {
+    healthHtml = '<div style="padding:20px;text-align:center;color:var(--text-tertiary);font-size:12px;">所有客户健康度良好</div>';
+  } else {
+    lowHealth.slice(0, 6).forEach(c => {
+      const color = c.healthScore < 60 ? '#E24B4A' : '#EF9F27';
+      healthHtml += `
+        <div class="health-row" onclick="showDetail(${c.id})" style="cursor:pointer">
+          <div class="health-dot" style="background:${color}"></div>
+          <span class="health-name">${c.name}</span>
+          <span class="health-stage">${c.stage}</span>
+          <div class="health-bar-wrap"><div class="health-bar" style="width:${c.healthScore}%;background:${color}"></div></div>
+          <span class="health-score" style="color:${color}">${c.healthScore}</span>
+        </div>
+      `;
+    });
+  }
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">客户分层<span class="badge" style="background:var(--amber-50);color:var(--amber-600)">${active.length} 家</span></div>
+      ${tierHtml}
+    </div>
+    <div class="card">
+      <div class="card-title">续费风险预警<span class="badge" style="background:var(--red-50);color:var(--red-600)">${atRisk.length} 家</span></div>
+      ${riskHtml}
+    </div>
+    <div class="card">
+      <div class="card-title">交付健康度<span class="badge" style="background:var(--amber-50);color:var(--amber-600)">低于70分 ${lowHealth.length} 家</span></div>
+      ${healthHtml}
+    </div>
+  `;
+}
+
+// ===== RENDER: Row 3 (Actions + Trend) =====
+function renderRow3() {
+  const data = getFiltered();
+  const active = data.filter(c => !c.isChurned);
+  const el = document.getElementById('row3');
+
+  // Actions - generated from risk + health data
+  const actions = [];
+  active.filter(c => c.daysToExpiry >= 0 && c.daysToExpiry <= 30).sort((a,b) => a.daysToExpiry - b.daysToExpiry).forEach(c => {
+    actions.push({ type: 'renew', text: `${c.name}合同${c.daysToExpiry<=0?'已到期':c.daysToExpiry+'天后到期'}，健康度${c.healthScore}${c.healthScore<60?'，需安排高层沟通':''}`, owner: c.owner });
+  });
+  active.filter(c => c.healthScore < 55).forEach(c => {
+    actions.push({ type: 'issue', text: `${c.name}健康度仅${c.healthScore}，当前处于${c.stage}，需排查原因`, owner: c.owner });
+  });
+  active.filter(c => c.stage === '首次交付期').slice(0, 3).forEach(c => {
+    actions.push({ type: 'deliver', text: `${c.name}首次交付进行中，确认数据质量并推进交付`, owner: c.owner });
+  });
+  let actionHtml = '';
+  if (actions.length === 0) {
+    actionHtml = '<div style="padding:20px;text-align:center;color:var(--text-tertiary);font-size:12px;">暂无待跟进事项</div>';
+  } else {
+    actions.slice(0, 7).forEach(a => {
+      const typeLabel = a.type === 'renew' ? '续费' : a.type === 'issue' ? '问题' : '交付';
+      const typeCls = `type-${a.type}`;
+      actionHtml += `
+        <div class="action-item">
+          <span class="action-type ${typeCls}">${typeLabel}</span>
+          <span class="action-text">${a.text}</span>
+          <span class="action-owner">${a.owner}</span>
+        </div>
+      `;
+    });
+  }
+
+  // Trend - last 6 months, calculated from real signed dates
+  const today = new Date();
+  const months = [];
+  const monthEnds = [];
+  for (let i = 5; i >= 0; i--) {
+    const start = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const end = new Date(today.getFullYear(), today.getMonth() - i + 1, 0); // last day of month
+    months.push(`${start.getFullYear()}-${String(start.getMonth()+1).padStart(2,'0')}`);
+    monthEnds.push(`${end.getFullYear()}-${String(end.getMonth()+1).padStart(2,'0')}-${String(end.getDate()).padStart(2,'0')}`);
+  }
+  // Count active clients signed on or before each month-end
+  const trendData = months.map((m, idx) => {
+    const me = monthEnds[idx];
+    const activeBefore = state.clients.filter(c => {
+      if (c.isChurned) return false;
+      if (!c.signedDate) return true; // no date: assume active from start
+      return c.signedDate <= me;
+    });
+    return activeBefore.length;
+  });
+  // Ensure last month = current global active count (trend is always global)
+  const globalActive = state.clients.filter(c => !c.isChurned);
+  trendData[trendData.length - 1] = globalActive.length;
+  // Calculate averages from actual month-over-month changes
+  const avgNew = (trendData.reduce((a,b,i) => i > 0 ? a + Math.max(0, b - trendData[i-1]) : a, 0) / 5).toFixed(1);
+  const totalChurned = state.clients.filter(c => c.isChurned).length;
+  const avgChurn = (totalChurned / 6).toFixed(1);
+  const maxTrend = Math.max(...trendData);
+  let trendBarsHtml = '';
+  const barColors = ['#B5D4F4','#B5D4F4','#85B7EB','#85B7EB','#378ADD','#185FA5'];
+  trendData.forEach((v, i) => {
+    const h = Math.round(v / maxTrend * 70);
+    const label = months[i].slice(5) + '月';
+    trendBarsHtml += `
+      <div class="trend-bar-wrap">
+        <div class="trend-num">${v}</div>
+        <div class="trend-bar" style="height:${h}px;background:${barColors[i]}"></div>
+        <div class="trend-label">${label}</div>
+      </div>
+    `;
+  });
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">本周待跟进行动清单<span class="badge" style="background:var(--amber-50);color:var(--amber-600)">${actions.length} 项</span></div>
+      ${actionHtml}
+    </div>
+    <div class="card">
+      <div class="card-title">客户增减趋势（近6个月）<span class="badge" style="background:var(--blue-50);color:var(--blue-600)">在投数</span></div>
+      <div class="trend-container">${trendBarsHtml}</div>
+      <div class="trend-summary">
+        <span class="summary-item">月均新签：<span class="c-green">+${avgNew}</span></span>
+        <span class="summary-item">月均失效：<span class="c-red">-${avgChurn}</span></span>
+        <span class="summary-item">净增长：<span>+${(avgNew - avgChurn).toFixed(1)}</span></span>
+      </div>
+    </div>
+  `;
+}
+
+// ===== DETAIL MODAL =====
+function showDetail(id) {
+  const c = state.clients.find(x => x.id === id);
+  if (!c) return;
+  const meta = TIER_META[c.tier];
+  const cls = c.daysToExpiry <= 15 ? 'red' : c.daysToExpiry <= 30 ? 'amber' : 'green';
+  const expiryLabel = c.daysToExpiry > 900 ? '待确认' : (c.daysToExpiry < 0 ? '已过期'+Math.abs(c.daysToExpiry)+'天' : c.daysToExpiry+'天后到期');
+  document.getElementById('modalTitle').textContent = c.name + ' - 详细信息';
+  document.getElementById('modalBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="background:var(--bg-secondary);padding:10px 14px;border-radius:var(--radius-md)">
+        <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">产品</div>
+        <div style="font-weight:500">${c.product}</div>
+      </div>
+      <div style="background:var(--bg-secondary);padding:10px 14px;border-radius:var(--radius-md)">
+        <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">当前阶段</div>
+        <div style="font-weight:500">${c.stage}</div>
+      </div>
+      <div style="background:var(--bg-secondary);padding:10px 14px;border-radius:var(--radius-md)">
+        <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">客户分层</div>
+        <div><span class="tier-tag" style="background:${meta.bg};color:${meta.text}">${c.tier}</span></div>
+      </div>
+      <div style="background:var(--bg-secondary);padding:10px 14px;border-radius:var(--radius-md)">
+        <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">合同到期</div>
+        <div style="font-weight:500">${c.contractEnd || '待确认'} <span class="risk-days ${c.daysToExpiry > 900 ? 'green' : cls}" style="font-size:10px">${expiryLabel}</span></div>
+      </div>
+      <div style="background:var(--bg-secondary);padding:10px 14px;border-radius:var(--radius-md)">
+        <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">健康度</div>
+        <div style="font-weight:500;color:${c.healthScore<60?'var(--red-600)':c.healthScore<75?'var(--amber-600)':'var(--green-600)'}">${c.healthScore} 分</div>
+      </div>
+      <div style="background:var(--bg-secondary);padding:10px 14px;border-radius:var(--radius-md)">
+        <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">负责人</div>
+        <div style="font-weight:500">${c.owner}</div>
+      </div>
+    </div>
+  `;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function showModalByGroup(title, clients) {
+  if (clients.length === 0) return;
+  document.getElementById('modalTitle').textContent = title;
+  let html = '<table class="detail-table"><thead><tr>';
+  html += '<th>客户名</th><th>产品</th><th>阶段</th><th>分层</th><th>健康度</th><th>到期</th><th>负责人</th>';
+  html += '</tr></thead><tbody>';
+  clients.forEach(c => {
+    const meta = TIER_META[c.tier];
+    const d = c.daysToExpiry;
+    const cls = d <= 15 ? 'red' : d <= 30 ? 'amber' : 'green';
+    const expLabel = d > 900 ? '待确认' : (d < 0 ? `过期${Math.abs(d)}天` : d + '天');
+    html += `<tr style="cursor:pointer" onclick="showDetail(${c.id})">
+      <td style="font-weight:500">${c.name}</td>
+      <td>${c.product}</td>
+      <td><span class="status-tag" style="background:var(--bg-secondary)">${c.stage}</span></td>
+      <td><span class="tier-tag" style="background:${meta.bg};color:${meta.text}">${c.tier}</span></td>
+      <td style="color:${c.healthScore<60?'var(--red-600)':c.healthScore<75?'var(--amber-600)':'inherit'};font-weight:500">${c.healthScore}</td>
+      <td><span class="risk-days ${cls}" style="font-size:10px">${expLabel}</span></td>
+      <td>${c.owner}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+// ===== RENDER ALL =====
+function renderAll() {
+  renderFilters();
+  renderKPIs();
+  renderRow1();
+  renderRow2();
+  renderRow3();
+  renderClientList();
+}
+
+// ===== CLIENT LIST (bottom panel) =====
+function showTagClients(type, value) {
+  // Close if called with null or same tag clicked again
+  if (!type || (state.activeTag && state.activeTag.type === type && state.activeTag.value === value)) {
+    state.activeTag = null;
+  } else {
+    state.activeTag = { type, value };
+  }
+  renderClientList();
+  // Scroll into view
+  const wrap = document.getElementById('clientListWrap');
+  if (state.activeTag) {
+    setTimeout(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  }
+}
+
+function renderClientList() {
+  const wrap = document.getElementById('clientListWrap');
+  if (!state.activeTag) {
+    wrap.classList.remove('show');
+    wrap.innerHTML = '';
+    return;
+  }
+  const { type, value } = state.activeTag;
+  let clients, label;
+  if (type === 'product') {
+    clients = state.clients.filter(c => c.product === value);
+    label = `产品：${value}`;
+  } else if (type === 'stage') {
+    clients = state.clients.filter(c => c.stage === value);
+    label = `状态：${value}`;
+  } else if (type === 'tier') {
+    clients = state.clients.filter(c => c.tier === value);
+    label = `分层：${value}`;
+  } else if (type === 'kpi') {
+    if (value === 'active') {
+      clients = state.clients.filter(c => !c.isChurned);
+      label = '在投客户';
+    } else if (value === 'churned') {
+      clients = state.clients.filter(c => c.isChurned);
+      label = '失效客户';
+    } else if (value === 'quarterNew') {
+      clients = state.clients.filter(c => c.isQuarterNew);
+      label = '本季新签客户';
+    } else if (value === 'expirySoon') {
+      clients = state.clients.filter(c => !c.isChurned && c.daysToExpiry >= 0 && c.daysToExpiry <= 30);
+      label = '30天内到期客户';
+    } else {
+      clients = [];
+      label = '';
+    }
+  } else {
+    clients = [];
+    label = '';
+  }
+
+  let rows = '';
+  clients.forEach(c => {
+    const meta = TIER_META[c.tier] || {};
+    const d = c.daysToExpiry;
+    const cls = d > 900 ? 'green' : d <= 15 ? 'red' : d <= 30 ? 'amber' : 'green';
+    const expLabel = d > 900 ? '待确认' : (d < 0 ? `过期${Math.abs(d)}天` : d + '天');
+    const healthColor = c.healthScore < 60 ? 'var(--red-600)' : c.healthScore < 75 ? 'var(--amber-600)' : 'var(--green-600)';
+    rows += `<tr onclick="showDetail(${c.id})">
+      <td class="cl-name">${c.name}</td>
+      <td>${c.product}</td>
+      <td><span class="status-tag" style="background:var(--bg-secondary)">${c.stage}</span></td>
+      <td><span class="tier-tag" style="background:${meta.bg||'var(--bg-secondary)'};color:${meta.text||'var(--text-tertiary)'}">${c.tier}</span></td>
+      <td style="color:${healthColor};font-weight:500">${c.healthScore}</td>
+      <td><span class="risk-days ${cls} cl-expiry">${expLabel}</span></td>
+      <td>${c.owner}</td>
+    </tr>`;
+  });
+
+  wrap.classList.add('show');
+  wrap.innerHTML = `
+    <div class="client-list-card">
+      <div class="client-list-header">
+        <div class="client-list-title">${label}<span>${clients.length} 家客户</span></div>
+        <button class="client-list-close" onclick="showTagClients(null,null)">✕</button>
+      </div>
+      <table class="client-list-table">
+        <thead><tr>
+          <th>客户名</th><th>产品</th><th>阶段</th><th>分层</th><th>健康度</th><th>到期</th><th>负责人</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ===== IMPORT / EXPORT =====
+
+// Robust date parser: handles Excel serial numbers, ISO strings, datetime strings
+function parseExcelDate(val) {
+  if (!val && val !== 0) return null;
+  // Number: Excel serial date
+  if (typeof val === 'number') {
+    if (val < 1) return null; // 0 or negative = no date
+    const d = XLSX.SSF.parse_date_code(val);
+    if (!d) return null;
+    return new Date(d.y, d.m - 1, d.d);
+  }
+  // String: try parsing
+  if (typeof val === 'string') {
+    const s = val.trim();
+    if (!s) return null;
+    // Handle "2026-11-14 00:00:00" format → take date part only
+    const datePart = s.split(' ')[0];
+    // Handle "2026/11/14" or "2026-11-14"
+    const match = datePart.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (match) return new Date(+match[1], +match[2] - 1, +match[3]);
+    // Fallback
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d;
+    return null;
+  }
+  // Date object
+  if (val instanceof Date) return val;
+  return null;
+}
+
+function formatDateISO(d) {
+  if (!d) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { raw: true });
+      if (rows.length === 0) { showToast('文件为空'); return; }
+      const today = new Date();
+      state.clients = rows.map((r, i) => {
+        // Normalize field values with flexible key matching
+        const name = r['客户名'] || r['name'] || `客户${i+1}`;
+        const product = r['产品'] || r['product'] || PRODUCTS[0];
+        const stage = r['当前阶段'] || r['stage'] || STAGES[0];
+        const tier = r['客户分层'] || r['tier'] || TIERS[2];
+        const healthRaw = r['健康度'] ?? r['healthScore'] ?? 75;
+        const healthScore = typeof healthRaw === 'number' ? healthRaw : parseInt(healthRaw) || 75;
+        const contractEndRaw = r['合同到期日'] ?? r['contractEnd'] ?? null;
+        const signedDateRaw = r['签约日期'] ?? r['signedDate'] ?? null;
+        const quarterNewRaw = r['季度新签'] ?? r['isQuarterNew'] ?? '否';
+        const owner = r['负责人'] || r['owner'] || '';
+        const notes = r['备注'] ?? r['notes'] ?? '';
+
+        // Parse dates robustly
+        const endDate = parseExcelDate(contractEndRaw);
+        const signedDate = parseExcelDate(signedDateRaw);
+        const contractEndStr = endDate ? formatDateISO(endDate) : '';
+        const signedDateStr = signedDate ? formatDateISO(signedDate) : '';
+
+        // Calculate days to expiry
+        let daysToExpiry;
+        if (endDate) {
+          daysToExpiry = Math.floor((endDate - today) / 86400000);
+        } else {
+          // No contract end date: treat as far future (new client, not yet set)
+          daysToExpiry = 999;
+        }
+
+        const isChurned = endDate ? (daysToExpiry < -15) : false;
+        const isQuarterNew = (String(quarterNewRaw) === '是' || quarterNewRaw === true || quarterNewRaw === 1);
+
+        return {
+          id: i + 1,
+          name,
+          product,
+          stage,
+          tier,
+          healthScore,
+          contractEnd: contractEndStr,
+          daysToExpiry,
+          isChurned,
+          isQuarterNew,
+          signedDate: signedDateStr,
+          owner,
+          notes: String(notes),
+        };
+      });
+      state.filterProduct = '全部';
+      state.filterStage = '全部';
+      state.filterTier = '全部';
+      saveToLocal();
+      renderAll();
+      showToast(`成功导入 ${state.clients.length} 条客户数据`);
+    } catch(err) {
+      console.error('Import error:', err);
+      showToast('导入失败：' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  this.value = '';
+});
+
+function exportTemplate() {
+  const headers = ['客户名', '产品', '当前阶段', '客户分层', '健康度', '合同到期日', '季度新签', '签约日期', '负责人', '备注'];
+  const sampleRow1 = ['星辰科技', 'GEO年度版', '循环优化期', '重点客户', 82, '2026-08-15', '是', '2026-03-10', '张三', ''];
+  const sampleRow2 = ['云帆网络', 'GEO季度版', '文章训练期', '常规客户', 68, '2026-06-20', '否', '', '李四', '文章方向待调整'];
+  const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow1, sampleRow2]);
+  // Set column widths
+  ws['!cols'] = headers.map((h, i) => ({ wch: i === 0 ? 14 : i === 9 ? 20 : 12 }));
+  // Add data validation notes
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '客户数据');
+  // Add reference sheet
+  const refHeaders = ['字段名', '说明', '可选值'];
+  const refData = [
+    ['客户名', '客户公司名称', '自由文本'],
+    ['产品', '所属产品线', 'GEO季度版 / GEO年度版 / GEO特殊版 / AI百问'],
+    ['当前阶段', '客户当前所处阶段', '资料准备期 / 账号搭建期 / 文章训练期 / 首次交付期 / 循环优化期 / 难点解决期 / 续费跟进期 / 账户失效期'],
+    ['客户分层', '客户重要性分层', '难点客户 / 重点客户 / 常规客户 / 项目客户 / 失效客户'],
+    ['健康度', '0-100分，低于60为预警', '数字'],
+    ['合同到期日', '合同到期日期', 'YYYY-MM-DD格式'],
+    ['季度新签', '是否本季度新签', '是 / 否'],
+    ['签约日期', '签约日期', 'YYYY-MM-DD格式'],
+    ['负责人', '运营负责人', '自由文本'],
+    ['备注', '备注信息', '自由文本'],
+  ];
+  const refWs = XLSX.utils.aoa_to_sheet([refHeaders, ...refData]);
+  refWs['!cols'] = [{ wch: 12 }, { wch: 24 }, { wch: 50 }];
+  XLSX.utils.book_append_sheet(wb, refWs, '字段说明');
+  try {
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '运营管控看板_数据模板.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    showToast('模板已下载，请按格式填写后导入');
+  } catch(err) {
+    showToast('下载失败：' + err.message);
+  }
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ===== KEYBOARD =====
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ===== LOCAL STORAGE =====
+const STORAGE_KEY = 'ops_dashboard_clients';
+const DATA_VERSION = 'v5'; // bump this when sample data changes to invalidate cache
+const STORAGE_VERSION_KEY = 'ops_dashboard_version';
+
+function saveToLocal() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.clients));
+    localStorage.setItem(STORAGE_VERSION_KEY, DATA_VERSION);
+  } catch(e) { /* storage full or disabled, ignore */ }
+}
+
+function loadFromLocal() {
+  try {
+    const ver = localStorage.getItem(STORAGE_VERSION_KEY);
+    if (ver !== DATA_VERSION) {
+      // Version mismatch: old cache, clear it
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_VERSION_KEY);
+      return null;
+    }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch(e) { /* corrupt data, ignore */ }
+  return null;
+}
+
+function resetData() {
+  localStorage.removeItem(STORAGE_KEY);
+  state.clients = generateSampleData();
+  state.filterProduct = '全部';
+  state.filterStage = '全部';
+  state.filterTier = '全部';
+  renderAll();
+  showToast('已重置为示例数据');
+}
+
+// ===== INIT =====
+state.clients = loadFromLocal() || generateSampleData();
+renderAll();
+</script>
+</body>
+</html>
