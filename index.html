@@ -329,6 +329,10 @@
       <span class="data-source-badge" id="dataSourceBadge" style="display:none"></span>
     </div>
     <div class="header-right">
+      <button class="import-btn" onclick="openCollabGuide()" style="border-color:var(--green-400);color:var(--green-600);font-weight:500">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        在线协作
+      </button>
       <label class="import-btn" for="fileInput">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
         导入数据
@@ -365,6 +369,82 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- 在线协作指南弹窗 -->
+<div class="modal-overlay" id="collabOverlay" onclick="if(event.target===this)closeCollabGuide()">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h2>多人协作数据更新指南</h2>
+      <button class="modal-close" onclick="closeCollabGuide()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;flex-direction:column;gap:20px">
+
+        <!-- 方案一：腾讯文档在线协作 -->
+        <div style="background:var(--green-50);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--green-100)">
+          <div style="font-weight:600;font-size:14px;margin-bottom:10px;color:var(--green-600)">📋 方案一：腾讯文档在线协作（推荐）</div>
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.8">
+            <div style="margin-bottom:8px"><b>适用场景：</b>团队成员共同编辑数据，实时协作</div>
+            <div style="margin-bottom:12px">
+              <b>操作步骤：</b>
+              <ol style="padding-left:18px;margin:6px 0">
+                <li>在腾讯文档创建在线表格（或用现有Excel导入）</li>
+                <li>按模板格式填写客户数据（点击下方"下载模板"获取格式）</li>
+                <li>将表格<b>分享给团队成员</b>，设置"可编辑"权限</li>
+                <li>数据更新后，在腾讯文档中点击<b>「文件 → 导出 → CSV」</b></li>
+                <li>将导出的 CSV 文件<b>拖拽到看板页面</b>或点击"导入数据"上传</li>
+              </ol>
+            </div>
+            <div style="background:var(--bg-primary);border-radius:var(--radius-md);padding:10px 14px;font-size:11px;color:var(--text-tertiary)">
+              💡 <b>提示：</b>也可以把腾讯文档的共享链接发给有 Python 环境的人，运行 <code>sync_data.py</code> 脚本自动同步到云端，这样所有看板用户都能看到最新数据。
+            </div>
+          </div>
+        </div>
+
+        <!-- 方案二：直接拖拽上传 -->
+        <div style="background:var(--blue-50);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--blue-100)">
+          <div style="font-weight:600;font-size:14px;margin-bottom:10px;color:var(--blue-600)">📁 方案二：直接拖拽上传</div>
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.8">
+            <div style="margin-bottom:8px"><b>适用场景：</b>快速更新，单人操作</div>
+            <ol style="padding-left:18px;margin:6px 0">
+              <li>下载模板，编辑客户数据</li>
+              <li>将 Excel/CSV 文件<b>直接拖拽到看板页面任意位置</b></li>
+              <li>数据即时更新到当前浏览器</li>
+            </ol>
+            <div style="margin-top:10px">
+              <span style="font-size:11px;color:var(--text-tertiary)">⚠️ 此方式仅更新本地数据，不会同步给其他人。如需共享，请用方案一 + sync_data.py。</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 方案三：sync_data.py 脚本 -->
+        <div style="background:var(--purple-50);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--purple-100)">
+          <div style="font-weight:600;font-size:14px;margin-bottom:10px;color:var(--purple-600)">🔄 方案三：脚本自动同步（需要 Python 环境）</div>
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.8">
+            <div style="margin-bottom:8px"><b>适用场景：</b>定时同步，数据发布到云端供所有人使用</div>
+            <div style="background:var(--bg-primary);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0">
+              <code style="font-size:12px">python3 sync_data.py ~/Downloads/运营数据.xlsx</code>
+            </div>
+            <div style="font-size:11px;color:var(--text-tertiary)">运行后将自动生成 data.json 并推送到 GitHub，看板页面刷新即可看到最新数据。</div>
+          </div>
+        </div>
+
+        <!-- 快速操作 -->
+        <div style="display:flex;gap:10px;justify-content:center;padding-top:8px;border-top:0.5px solid var(--border)">
+          <button class="import-btn" onclick="exportTemplate();closeCollabGuide()" style="border-color:var(--blue-400);color:var(--blue-600)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+            下载数据模板
+          </button>
+          <button class="import-btn" onclick="document.getElementById('fileInput').click();closeCollabGuide()" style="border-color:var(--green-400);color:var(--green-600)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            立即导入数据
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 // ===== DATA MODEL =====
@@ -1014,76 +1094,7 @@ function formatDateISO(d) {
 document.getElementById('fileInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { raw: true });
-      if (rows.length === 0) { showToast('文件为空'); return; }
-      const today = new Date();
-      state.clients = rows.map((r, i) => {
-        // Normalize field values with flexible key matching
-        const name = r['客户名'] || r['name'] || `客户${i+1}`;
-        const product = r['产品'] || r['product'] || PRODUCTS[0];
-        const stage = r['当前阶段'] || r['stage'] || STAGES[0];
-        const tier = r['客户分层'] || r['tier'] || TIERS[2];
-        const healthRaw = r['健康度'] ?? r['healthScore'] ?? 75;
-        const healthScore = typeof healthRaw === 'number' ? healthRaw : parseInt(healthRaw) || 75;
-        const contractEndRaw = r['合同到期日'] ?? r['contractEnd'] ?? null;
-        const signedDateRaw = r['签约日期'] ?? r['signedDate'] ?? null;
-        const quarterNewRaw = r['季度新签'] ?? r['isQuarterNew'] ?? '否';
-        const owner = r['负责人'] || r['owner'] || '';
-        const notes = r['备注'] ?? r['notes'] ?? '';
-
-        // Parse dates robustly
-        const endDate = parseExcelDate(contractEndRaw);
-        const signedDate = parseExcelDate(signedDateRaw);
-        const contractEndStr = endDate ? formatDateISO(endDate) : '';
-        const signedDateStr = signedDate ? formatDateISO(signedDate) : '';
-
-        // Calculate days to expiry
-        let daysToExpiry;
-        if (endDate) {
-          daysToExpiry = Math.floor((endDate - today) / 86400000);
-        } else {
-          // No contract end date: treat as far future (new client, not yet set)
-          daysToExpiry = 999;
-        }
-
-        const isChurned = endDate ? (daysToExpiry < -15) : false;
-        const isQuarterNew = (String(quarterNewRaw) === '是' || quarterNewRaw === true || quarterNewRaw === 1);
-
-        return {
-          id: i + 1,
-          name,
-          product,
-          stage,
-          tier,
-          healthScore,
-          contractEnd: contractEndStr,
-          daysToExpiry,
-          isChurned,
-          isQuarterNew,
-          signedDate: signedDateStr,
-          owner,
-          notes: String(notes),
-        };
-      });
-      state.filterProduct = '全部';
-      state.filterStage = '全部';
-      state.filterTier = '全部';
-      state.dataSource = 'import';
-      state.dataUpdatedAt = '';
-      saveToLocal();
-      renderAll();
-      showToast(`成功导入 ${state.clients.length} 条客户数据`);
-    } catch(err) {
-      console.error('Import error:', err);
-      showToast('导入失败：' + err.message);
-    }
-  };
-  reader.readAsArrayBuffer(file);
+  processUploadedFile(file);
   this.value = '';
 });
 
@@ -1137,8 +1148,141 @@ function showToast(msg) {
   setTimeout(() => el.classList.remove('show'), 3000);
 }
 
+// ===== COLLAB GUIDE =====
+function openCollabGuide() {
+  document.getElementById('collabOverlay').classList.add('show');
+}
+function closeCollabGuide() {
+  document.getElementById('collabOverlay').classList.remove('show');
+}
+
+// ===== DRAG & DROP FILE UPLOAD =====
+const dropZone = document.body;
+dropZone.addEventListener('dragover', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  dropZone.style.outline = '2px dashed var(--green-400)';
+  dropZone.style.outlineOffset = '-4px';
+});
+dropZone.addEventListener('dragleave', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  dropZone.style.outline = '';
+});
+dropZone.addEventListener('drop', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  dropZone.style.outline = '';
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    const file = files[0];
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (['xlsx', 'xls', 'csv'].includes(ext)) {
+      processUploadedFile(file);
+    } else {
+      showToast('请上传 .xlsx / .xls / .csv 格式的文件');
+    }
+  }
+});
+
+function processUploadedFile(file) {
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const ext = file.name.split('.').pop().toLowerCase();
+      let rows;
+      if (ext === 'csv') {
+        // Parse CSV manually
+        const text = new TextDecoder('utf-8').decode(new Uint8Array(ev.target.result));
+        rows = parseCSV(text);
+      } else {
+        // Excel
+        const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { raw: true });
+      }
+      if (!rows || rows.length === 0) { showToast('文件为空或格式不正确'); return; }
+      applyImportedData(rows);
+      showToast(`✅ 已导入 ${state.clients.length} 条客户数据（来自 ${file.name}）`);
+    } catch(err) {
+      console.error('Upload error:', err);
+      showToast('导入失败：' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseCSV(text) {
+  // Simple CSV parser that handles quoted fields
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = [];
+    let current = '';
+    let inQuotes = false;
+    for (const ch of lines[i]) {
+      if (ch === '"') { inQuotes = !inQuotes; continue; }
+      if (ch === ',' && !inQuotes) { vals.push(current.trim()); current = ''; continue; }
+      current += ch;
+    }
+    vals.push(current.trim());
+    const row = {};
+    headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
+    result.push(row);
+  }
+  return result;
+}
+
+function applyImportedData(rows) {
+  const today = new Date();
+  state.clients = rows.map((r, i) => {
+    const name = r['客户名'] || r['name'] || `客户${i+1}`;
+    const product = r['产品'] || r['product'] || PRODUCTS[0];
+    const stage = r['当前阶段'] || r['stage'] || STAGES[0];
+    const tier = r['客户分层'] || r['tier'] || TIERS[2];
+    const healthRaw = r['健康度'] ?? r['healthScore'] ?? 75;
+    const healthScore = typeof healthRaw === 'number' ? healthRaw : parseInt(healthRaw) || 75;
+    const contractEndRaw = r['合同到期日'] ?? r['contractEnd'] ?? null;
+    const signedDateRaw = r['签约日期'] ?? r['signedDate'] ?? null;
+    const quarterNewRaw = r['季度新签'] ?? r['isQuarterNew'] ?? '否';
+    const owner = r['负责人'] || r['owner'] || '';
+    const notes = r['备注'] ?? r['notes'] ?? '';
+
+    const endDate = parseExcelDate(contractEndRaw);
+    const signedDate = parseExcelDate(signedDateRaw);
+    const contractEndStr = endDate ? formatDateISO(endDate) : '';
+    const signedDateStr = signedDate ? formatDateISO(signedDate) : '';
+
+    let daysToExpiry;
+    if (endDate) {
+      daysToExpiry = Math.floor((endDate - today) / 86400000);
+    } else {
+      daysToExpiry = 999;
+    }
+    const isChurned = endDate ? (daysToExpiry < -15) : false;
+    const isQuarterNew = (String(quarterNewRaw) === '是' || quarterNewRaw === true || quarterNewRaw === 1);
+
+    return {
+      id: i + 1,
+      name, product, stage, tier, healthScore,
+      contractEnd: contractEndStr, daysToExpiry, isChurned,
+      isQuarterNew, signedDate: signedDateStr, owner, notes: String(notes),
+    };
+  });
+  state.filterProduct = '全部';
+  state.filterStage = '全部';
+  state.filterTier = '全部';
+  state.activeTag = null;
+  state.dataSource = 'import';
+  state.dataUpdatedAt = '';
+  saveToLocal();
+  renderAll();
+}
+
 // ===== KEYBOARD =====
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeCollabGuide(); } });
 
 // ===== LOCAL STORAGE =====
 const STORAGE_KEY = 'ops_dashboard_clients';
